@@ -162,19 +162,48 @@ def recordShot():
     elif res=="H":
         Board[y][x].state = HIT
     elif res=="S":
-        l = int(input("Length of sunk ship: "))
         axis = input("X-axis or Y-axis? ")
-        end = int(input("Cordinate: ")) - 1
+        coord = int(input("Cordinate: ")) - 1
         if axis=="X" or axis=="Y":
             axisIsX = True if axis=="X" else False
-            start = x if axisIsX else y
-            for i in range(min(start, end), max(start, end)+1):
+            start = min((x if axisIsX else y), coord)
+            end = max((x if axisIsX else y), coord)
+
+            for i in range(start-1, end+2):
                 if axisIsX:
                     Board[y][i].state = SNK
                     Board[y][i].value = 0
+                    if inBounds(y-1,i):
+                        Board[y-1][i].state = MSS
+                        Board[y-1][i].value = 0
+                    if inBounds(y+1,i):
+                        Board[y+1][i].state = MSS
+                        Board[y+1][i].value = 0
+                    
                 else:
                     Board[i][x].state = SNK
                     Board[i][x].value = 0
+                    if inBounds(i,x-1):
+                        Board[i][x-1].state = MSS
+                        Board[i][x-1].value = 0
+                    if inBounds(i,x+1):
+                        Board[i][x+1].state = MSS
+                        Board[i][x+1].value = 0
+            if axisIsX:
+                if inBounds(y,start-1):
+                    Board[y][start-1].state = MSS
+                    Board[y][start-1].value = 0
+                if inBounds(y,end+1):
+                    Board[y][end+1].state = MSS
+                    Board[y][end+1].value = 0
+            else:
+                if inBounds(start-1,x):
+                    Board[start-1][x].state = MSS
+                    Board[start-1][x].value = 0
+                if inBounds(end+1,x):
+                    Board[end+1][x].state = MSS
+                    Board[end+1][x].value = 0
+
             sunkLength = abs(start-end)
             Ships.remove(sunkLength)
             if len(Ships)==0:
