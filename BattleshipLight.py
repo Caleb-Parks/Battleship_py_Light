@@ -1,4 +1,4 @@
-from re import S
+# from re import S
 
 
 print("Hunt begins.\n")
@@ -8,7 +8,7 @@ print("Hunt begins.\n")
 useLattice=True
 Ships = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]
 
-WTR="~"
+WTR=" "
 HIT="H"
 MSS="*"
 SNK="S"
@@ -152,13 +152,15 @@ def recordSink(y:int,x:int):
         global GameOver
         GameOver=True
 
-def huntHeuristic(): # DOCU
+def huntHeuristic():
+    """Searches for unsunk hits, weighting possible positions of the rest of the ship with HUNTBOX_WGT"""
     foundHit=False
+    # Searches for Hit
     for y in range(0, 10):
         for x in range(0, 10):
             if isState(y,x,HIT):
                 foundHit=True
-                resetweights() # DEBUG needed?
+                # Setting hitstreak if applicable
                 if isState(y,x+1,HIT):
                     HS.start = x
                     HS.end = x+1
@@ -170,7 +172,7 @@ def huntHeuristic(): # DOCU
                     HS.coord = x
                     HS.isVert = True
                 else:
-                    # Isolated Hit
+                    # Isolated Hit, setting weights
                     addWGT(y-1,x,HUNTBOX_WGT)
                     addWGT(y+1,x,HUNTBOX_WGT)
                     addWGT(y,x-1,HUNTBOX_WGT)
@@ -205,8 +207,8 @@ def possiblePositionsHeuristic():
                     for i in range(0, length):
                         addWGT(y+i,x,PSBLPOS_WGT)
 
-def latticeHeuristic(seekSize: int): # DOCU
-    """?"""
+def latticeHeuristic(seekSize: int):
+    """Caculates and weights with LATTICE_WGT the minimum set of spots that a ship of passed size must touch"""
     for y in range(0, 10):
         for x in range(0, 10):
             if isState(y,x,WTR) and (x+y)%seekSize==0:
@@ -225,8 +227,6 @@ def calibrate():
         if useLattice:
             latticeHeuristic(Ships[0])
 
-
-
 def printBoard(printweights:bool):
     """Prints the board's weights if True is passed, else prints the board's states"""
     print("\n##    1   2   3   4   5   6   7   8   9   10\n")
@@ -239,8 +239,6 @@ def printBoard(printweights:bool):
         for x, spt in enumerate(line):
             spt.prntweight() if printweights else spt.prntState()
         print("]\n") # End of line
-
-
 
 def recordShot():
     """Records and proccesses a shot and its results"""
@@ -257,7 +255,6 @@ def recordShot():
 
 
 # MAIN
-printBoard(True) #DEBUG
 while not GameOver:
     calibrate()
     printBoard(False)
