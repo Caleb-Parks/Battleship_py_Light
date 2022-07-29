@@ -36,16 +36,7 @@ class Spot:
         elif st=="S":
             self.state=SNK
         elif st=="W":
-            self.state=WTR
-    def prntweight(self):
-        if self.weight<=9:
-            print(" ",int(self.weight),"  ",sep="",end="")
-        elif self.weight<=99:
-            print(" ",int(self.weight)," ",sep="",end="")
-        else:
-            print(int(self.weight)," ",sep="",end="")
-    def prntState(self):
-        print(" ",self.state,"  ",sep="",end="")
+            self.state=WTR   
      
 Board=[]
 for col in range (0, 10):
@@ -214,6 +205,15 @@ def latticeHeuristic(seekSize: int):
             if isState(y,x,WTR) and (x+y)%seekSize==0:
                 addWGT(y,x,LATTICE_WGT)
 
+def highestWeight():
+    """Returns the highest weight on the board"""
+    highest = 0
+    for y in range(0, 10):
+        for x in range(0, 10):
+            if Board[y][x].weight > highest:
+                highest = Board[y][x].weight
+    return highest
+
 
 
 # CORE FUNCTIONS
@@ -228,6 +228,7 @@ def calibrate():
             latticeHeuristic(Ships[0])
 
 def printBoard(printweights:bool):
+    topWgt = highestWeight()
     """Prints the board's weights if True is passed, else prints the board's states"""
     print("\n##    1   2   3   4   5   6   7   8   9   10\n")
     for y, line in enumerate(Board):
@@ -237,7 +238,19 @@ def printBoard(printweights:bool):
         print(y+1," [ ",sep="",end="")
         # Printing Line:
         for x, spt in enumerate(line):
-            spt.prntweight() if printweights else spt.prntState()
+            if printweights:
+                if spt.weight<=9:
+                    print(" ",int(spt.weight)," ",sep="",end="")
+                elif spt.weight<=99:
+                    print(" ",int(spt.weight),sep="",end="")
+                else:
+                    print(int(spt.weight),sep="",end="")
+                if spt.weight==topWgt:
+                    print("^",end="") 
+                else:
+                    print(" ",end="")
+            else:
+                print(" ",spt.state,"  ",sep="",end="")
         print("]\n") # End of line
 
 def recordShot():
