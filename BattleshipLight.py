@@ -1,6 +1,3 @@
-# from re import S
-
-
 print("Hunt begins.\n")
 
 # GLOBALS
@@ -90,7 +87,7 @@ def recordSink(y:int,x:int):
         HS.start = x
         HS.end = x
         HS.coord = y
-        HS.isVert = True
+        HS.isVert = False
     else:
         if isState(y,x-1,HIT):
             HS.start = x-1
@@ -151,6 +148,8 @@ def huntHeuristic():
         for x in range(0, 10):
             if isState(y,x,HIT):
                 foundHit=True
+                if useLattice:
+                    latticeHeuristic(Ships[0])
                 # Setting hitstreak if applicable
                 if isState(y,x+1,HIT):
                     HS.start = x
@@ -272,6 +271,8 @@ while not GameOver:
     calibrate()
     printBoard(False)
     printBoard(True)
+    print(Ships)
     recordShot()
 printBoard(False)
 print("\nCongrats!")
+
