@@ -1,111 +1,199 @@
-print("Hunt begins.")
+print("Hunt begins.\n")
 
-WTR="_"
+# GLOBALS
+
+WTR="~"
 HIT="H"
 MSS="*"
 SNK="S"
-SRCH="SR"#Search for ships via lattice
-SINK="SK"#Sink hit ships
-LATTICE_WGT = 1 # Weight of lattice pattern
-KILLBOX_WGT = 5 # Weight of killbox pattern
-SHIP_LENGTHS = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]
+
+DEFAULT_WGT = 0
+PSBLPOS_WGT = 1
+LATTICE_WGT = 2 # Weight of lattice pattern
+KILLBOX_WGT = 100 # Weight of killbox pattern
+
+GameOver = False
+
+Ships = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]
+# class Ship:
+#     def __init__(self, len):
+#         self.length = len
+#         self.isSunk = False
+# ShipList = []
+# for s in SHIP_LENGTHS:
+#     ShipList.append(Ship(s))
 
 
-class Ship:
-    def __init__(self, len):
-        self.length = len
-        self.isSunk = False
-ShipList = []
-for s in SHIP_LENGTHS:
-    ShipList.append(Ship(s))
+
+# OBJECTS
 
 class Spot:
-    def __init__(self, xCord:int, yCord:int):
+    def __init__(self):
         self.state = WTR
-        self.val = 0
-        self.x = xCord
-        self.y = yCord
-Board = []
+        self.value = DEFAULT_WGT
+    # def __init__(self, xCord:int, yCord:int):
+    #     self.state = WTR
+    #     self.val = 0
+    #     self.x = xCord
+    #     self.y = yCord
+    def setState(self, st):
+        if st=="M":
+            self.state=MSS 
+        elif st=="H":
+            self.state=HIT
+        elif st=="S":
+            self.state=SNK
+        elif st=="W":
+            self.state=WTR
+    def prntValue(self):
+        if self.value<=9:
+            print(" ",int(self.value),"  ",sep="",end="")
+        elif self.value<=99:
+            print(" ",int(self.value)," ",sep="",end="")
+        else:
+            print(int(self.value)," ",sep="",end="")
+    def prntState(self):
+        print(" ",self.state,"  ",sep="",end="")
+     
+Board=[]
 for col in range (0, 10):
     c = []
     for row in range (0, 10):
-        c.append(Spot(col, row))
+        c.append(Spot())
     Board.append(c)
 
 
-GameOver = False
-TargetList = []
-LastHit = (-1,-1)
-Mode = SRCH
 
+# UTIL FUNCTIONS
 
-def fire(s:Spot):
-    result = input("Shoot at ",s.x,s.y,": ", sep="")
-    if result!=HIT and result!=MSS:
-        print("ERROR")
-        return fire(s)
-    else:
-        Board[x][y].state=result
-        Board[x][y].val=0
-        return result==HIT
+def inBounds(y, x): # DEBUG?
+    return y>=0 and y<=9 and x>=0 and x<=9
 
-def inBounds(s:Spot):
-    return s.x>=0 and s.x<=9 and s.y>=0 and s.y<=9
+# def buildLattice(seekSize: int):
+#     for x, col in enumerate(Board):
+#         for y, spt in enumerate(col):
+#             if spt.state==WTR and (x+y)%seekSize==0: # if (RowIndex+ColIndex)%shipLength==0 : then part of target matrix (0-based) sum of the row and column indices and check if they’re divisible by five. If they are, the square is in our shot pattern. We can generalize this idea to any ship length.
+#                 spt.val = spt.val + LATTICE_WGT
+#                 TargetList.append(spt)
 
+# getNeighbors(x, y): # Returns list of neighbors
 
-def buildLattice(seekSize: int):
-    for x, col in enumerate(Board):
-        for y, spt in enumerate(col):
-            if spt.state==WTR and (x+y)%seekSize==0: # if (RowIndex+ColIndex)%shipLength==0 : then part of target matrix (0-based) sum of the row and column indices and check if they’re divisible by five. If they are, the square is in our shot pattern. We can generalize this idea to any ship length.
-                spt.val = spt.val + LATTICE_WGT
-                TargetList.append(spt)
+def possibleSpot(y:int, x:int):
+    return inBounds(y, x) and Board[y][x].state==WTR
 
-def buildKillZone(x:int, y:int):
-    if inBounds(x, y-1) and Board[x][y-1].state==WTR:
-        TargetList.append((x, y-1, KILLBOX_WGT))
-    
+def resetValues():
     for y, line in enumerate(Board):
         for x, spt in enumerate(line):
-            if spt.state==WTR and (x+y)%seekSize==0: # if (RowIndex+ColIndex)%shipLength==0 : then part of target matrix (0-based) sum of the row and column indices and check if they’re divisible by five. If they are, the square is in our shot pattern. We can generalize this idea to any ship length.
-                TargetList.append((x, y, LATTICE_WGT))
+            spt.value = DEFAULT_WGT
 
 
+
+# CORE FUNCTIONS
+
+def calibrate():
+    resetValues()
+    for length in Ships:
+        for row in range(0, 10):
+            for col in range(0, 10):
+                x_validPlace = True
+                y_validPlace = True
+                for i in range(0, length):
+                    if not possibleSpot(row,col+i):
+                        x_validPlace=False
+                    if not possibleSpot(row+i,col):
+                        y_validPlace=False
+                if x_validPlace:
+                    for i in range(0, length):
+                        Board[row][col+i].value += PSBLPOS_WGT
+                if y_validPlace:
+                    for i in range(0, length):
+                        Board[row+i][col].value += PSBLPOS_WGT
+
+    # int maxShipSz = head->getShipSz();
+
+	# 	//Setting horizontal placements
+	# 	for (int y = 0; y < BoardSize; y++) {//Iterates rows
+	# 		for (int x = 0; x <= BoardSize - maxShipSz; x++) {//Iterates colums
+	# 			int xRun = 0;
+
+	# 			for (int i = x; i < x + maxShipSz; i++)
+	# 				if (!validTarget(Grid[y][i].getStatus()))
+	# 					i = BoardSize;//Breaking out
+	# 				else
+	# 					xRun++;
+
+	# 			for (ShipLNode* curShip = head; curShip != nullptr; curShip = curShip->next()) 
+	# 				if (curShip->getShipSz() <= xRun) 
+	# 					for (int i = x; i < x + curShip->getShipSz(); i++) 
+	# 						PMap[y][i]++;
+	# 		}//End of column iteration
+	# 	}//End of row iteration
+
+
+
+
+    # for y, line in enumerate(Board):
+        
+    #     for x, spt in enumerate(line):
+    #         spt.value = 1 # WORKHERE
+
+    # WORKHERE
+
+
+
+def printBoard(printValues:bool):
+    print("\n##    1   2   3   4   5   6   7   8   9   10\n")
+    for y, line in enumerate(Board):
+        if y<9: # For line number
+            print(" ",end="") # For line number
+        print(y+1," [ ",sep="",end="") # For line number
+        for x, spt in enumerate(line):
+            spt.prntValue() if printValues else spt.prntState()
+        print("]\n") # End of line
+
+
+
+def recordShot():
+    x = int(input("\nX cord of shot: ")) - 1
+    y = int(input("Y cord of shot: ")) - 1
+    res = input("Result (H, M, or S): ")
+    if res=="M":
+        Board[y][x].state = MSS
+    elif res=="H":
+        Board[y][x].state = HIT
+    elif res=="S":
+        l = int(input("Length of sunk ship: "))
+        axis = input("X-axis or Y-axis? ")
+        end = int(input("Cordinate: ")) - 1
+        if axis=="X" or axis=="Y":
+            axisIsX = True if axis=="X" else False
+            start = x if axisIsX else y
+            for i in range(min(start, end), max(start, end)+1):
+                if axisIsX:
+                    Board[y][i].state = SNK
+                    Board[y][i].value = 0
+                else:
+                    Board[i][x].state = SNK
+                    Board[i][x].value = 0
+            sunkLength = abs(start-end)
+            Ships.remove(sunkLength)
+            if len(Ships)==0:
+                GameOver==True
+        else:
+            print("ERROR: Invalid Axis!")
+            recordShot()
+    else:
+        print("ERROR! Invalid result!")
+        recordShot()
 
 
 
 # MAIN
 
+printBoard(True) #DEBUG
+
 while not GameOver:
-    
-    if Mode==SRCH:
-        if TargetList==[]:
-            buildLattice(ShipList[0].length)
-        current = TargetList.pop(0)
-        if fire(current[0], current[1]): # If shot is hit
-            LastHit = current
-            Mode==SINK
-            TargetList=[]
-
-    elif Mode==SINK:
-        if TargetList==[]:
-            buildKillZone(LastHit[0], LastHit[1])
-        current = TargetList.pop(0)
-        if fire(current[0], current[1]): # If shot is hit
-            LastHit = current
-            Mode==SINK
-            TargetList=[]
-        
-        print(targetList)
-        gameOver = True
-
-    Board[1][1].state = "H" # DEBUG
-
-    for x, col in enumerate(Board):
-        for y, row in enumerate(col):
-            if row.state=="H":
-                targetList.append((x, y, 0)) # WORKHERE
-
-
-
-
-# if (RowIndex+ColIndex)%shipLength==0 : then part of target matrix (0-based) sum of the row and column indices and check if they’re divisible by five. If they are, the square is in our shot pattern. We can generalize this idea to any ship length.
+    calibrate()
+    printBoard(False)
+    printBoard(True)
+    recordShot()
