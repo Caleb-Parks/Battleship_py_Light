@@ -1,6 +1,12 @@
+from re import S
+
+
 print("Hunt begins.\n")
 
 # GLOBALS
+
+useLattice=True
+Ships = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]
 
 WTR="~"
 HIT="H"
@@ -8,20 +14,11 @@ MSS="*"
 SNK="S"
 
 DEFAULT_WGT = 0
-PSBLPOS_WGT = 1
-LATTICE_WGT = 2 # Weight of lattice pattern
-KILLBOX_WGT = 100 # Weight of killbox pattern
+PSBLPOS_WGT = 1 # Weight of a possible ship position
+LATTICE_WGT = 1 # Weight of lattice pattern
+HUNTBOX_WGT = 100 # Weight of huntbox pattern
 
 GameOver = False
-
-Ships = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]
-# class Ship:
-#     def __init__(self, len):
-#         self.length = len
-#         self.isSunk = False
-# ShipList = []
-# for s in SHIP_LENGTHS:
-#     ShipList.append(Ship(s))
 
 
 
@@ -30,12 +27,7 @@ Ships = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]
 class Spot:
     def __init__(self):
         self.state = WTR
-        self.value = DEFAULT_WGT
-    # def __init__(self, xCord:int, yCord:int):
-    #     self.state = WTR
-    #     self.val = 0
-    #     self.x = xCord
-    #     self.y = yCord
+        self.weight = DEFAULT_WGT
     def setState(self, st):
         if st=="M":
             self.state=MSS 
@@ -45,13 +37,13 @@ class Spot:
             self.state=SNK
         elif st=="W":
             self.state=WTR
-    def prntValue(self):
-        if self.value<=9:
-            print(" ",int(self.value),"  ",sep="",end="")
-        elif self.value<=99:
-            print(" ",int(self.value)," ",sep="",end="")
+    def prntweight(self):
+        if self.weight<=9:
+            print(" ",int(self.weight),"  ",sep="",end="")
+        elif self.weight<=99:
+            print(" ",int(self.weight)," ",sep="",end="")
         else:
-            print(int(self.value)," ",sep="",end="")
+            print(int(self.weight)," ",sep="",end="")
     def prntState(self):
         print(" ",self.state,"  ",sep="",end="")
      
@@ -62,167 +54,214 @@ for col in range (0, 10):
         c.append(Spot())
     Board.append(c)
 
+class Hitstreak:
+    def __init__(self):
+        self.start = -1
+        self.end = -1
+        self.coord = -1
+        self.isVert = False
+HS = Hitstreak()
+
 
 
 # UTIL FUNCTIONS
 
-def inBounds(y, x): # DEBUG?
+def inBounds(y, x):
+    """Returns true if the passed spot is inside the Board's bounds"""
     return y>=0 and y<=9 and x>=0 and x<=9
 
-# def buildLattice(seekSize: int):
-#     for x, col in enumerate(Board):
-#         for y, spt in enumerate(col):
-#             if spt.state==WTR and (x+y)%seekSize==0: # if (RowIndex+ColIndex)%shipLength==0 : then part of target matrix (0-based) sum of the row and column indices and check if they’re divisible by five. If they are, the square is in our shot pattern. We can generalize this idea to any ship length.
-#                 spt.val = spt.val + LATTICE_WGT
-#                 TargetList.append(spt)
+def isState(y:int, x:int, st8:str):
+    """Returns true if the passed spot is the passed state and is in bounds"""
+    return inBounds(y, x) and Board[y][x].state==st8
 
-# getNeighbors(x, y): # Returns list of neighbors
-
-def possibleSpot(y:int, x:int):
-    return inBounds(y, x) and Board[y][x].state==WTR
-
-def resetValues():
+def resetweights():
+    """Resets all spots' weights"""
     for y, line in enumerate(Board):
         for x, spt in enumerate(line):
-            spt.value = DEFAULT_WGT
+            spt.weight = DEFAULT_WGT
+
+def set(y:int, x:int, st8, w8):
+    """Sets the passed spot to the passed state and weight"""
+    if inBounds(y,x):
+        Board[y][x].state = st8
+        Board[y][x].weight = w8
+
+def addWGT(y:int, x:int, weight):
+    """Increments the specified spot (must be water) by the specified weight"""
+    if inBounds(y,x) and Board[y][x].state==WTR:
+        Board[y][x].weight += weight
+
+def recordSink(y:int,x:int):
+    """Marks hits on a sunk ship as sunk, marks spots around sunk ship as misses"""
+    set(y,x,HIT,0)
+    if not (isState(y-1,x,HIT) or isState(y+1,x,HIT) or isState(y,x-1,HIT) or isState(y,x+1,HIT)):
+        # (Sunk a ship of length=1)
+        HS.start = x
+        HS.end = x
+        HS.coord = y
+        HS.isVert = True
+    else:
+        if isState(y,x-1,HIT):
+            HS.start = x-1
+            HS.end = x
+            HS.coord = y
+            HS.isVert = False
+        elif isState(y-1,x,HIT):
+            HS.start = y-1
+            HS.end = y
+            HS.coord = x
+            HS.isVert = True   
+        elif isState(y,x+1,HIT):
+            HS.start = x
+            HS.end = x+1
+            HS.coord = y
+            HS.isVert = False
+        elif isState(y+1,x,HIT):
+            HS.start = y
+            HS.end = y+1
+            HS.coord = x
+            HS.isVert = True  
+        # Building full hitstreak:
+        while True:
+            if (HS.isVert and isState(HS.start-1,HS.coord,HIT)) or (not HS.isVert and isState(HS.coord,HS.start-1,HIT)):
+                HS.start -= 1
+            elif (HS.isVert and isState(HS.end+1,HS.coord,HIT)) or (not HS.isVert and isState(HS.coord,HS.end+1,HIT)):
+                HS.end += 1
+            else:
+                break
+    # Marking misses around sunk ship:
+    for i in range(HS.start-1, HS.end+2):
+        if HS.isVert:
+            set(i,HS.coord,SNK,0)
+            set(i,HS.coord-1,MSS,0)
+            set(i,HS.coord+1,MSS,0)
+        else:
+            set(HS.coord,i,SNK,0)
+            set(HS.coord-1,i,MSS,0)
+            set(HS.coord+1,i,MSS,0)
+    if HS.isVert:
+        set(HS.start-1,HS.coord,MSS,0)
+        set(HS.end+1,HS.coord,MSS,0)
+    else:
+        set(HS.coord,HS.start-1,MSS,0)
+        set(HS.coord,HS.end+1,MSS,0)
+    # Removing sunk ship from Ships[]:
+    Ships.remove(abs(HS.end-HS.start)+1)
+    # Checking for win:
+    if len(Ships)==0:
+        global GameOver
+        GameOver=True
+
+def huntHeuristic(): # DOCU
+    foundHit=False
+    for y in range(0, 10):
+        for x in range(0, 10):
+            if isState(y,x,HIT):
+                foundHit=True
+                resetweights() # DEBUG needed?
+                if isState(y,x+1,HIT):
+                    HS.start = x
+                    HS.end = x+1
+                    HS.coord = y
+                    HS.isVert = False
+                elif isState(y+1,x,HIT):
+                    HS.start = y
+                    HS.end = y+1
+                    HS.coord = x
+                    HS.isVert = True
+                else:
+                    # Isolated Hit
+                    addWGT(y-1,x,HUNTBOX_WGT)
+                    addWGT(y+1,x,HUNTBOX_WGT)
+                    addWGT(y,x-1,HUNTBOX_WGT)
+                    addWGT(y,x+1,HUNTBOX_WGT)
+                    continue                    
+                # Building full hitstreak:
+                while (HS.isVert and isState(HS.end+1,HS.coord,HIT)) or (not HS.isVert and isState(HS.coord,HS.end+1,HIT)):
+                    HS.end += 1
+                # Weighting spot before start of hitstreak:
+                addWGT(HS.start-1,x,HUNTBOX_WGT) if HS.isVert else addWGT(y,HS.start-1,HUNTBOX_WGT)
+                # Weighting spot after end of hitstreak:
+                addWGT(HS.end+1,HS.coord,HUNTBOX_WGT) if HS.isVert else addWGT(HS.coord,HS.end+1,HUNTBOX_WGT)              
+                return foundHit
+    return foundHit
+
+def possiblePositionsHeuristic():
+    """Calculates each possible position for each ship and increments the weights of the spots in that position by PSBLPOS_WGT"""
+    for length in Ships:
+        for y in range(0, 10):
+            for x in range(0, 10):
+                x_validPlace = True
+                y_validPlace = True
+                for i in range(0, length):
+                    if not isState(y,x+i,WTR):
+                        x_validPlace=False
+                    if not isState(y+i,x,WTR):
+                        y_validPlace=False
+                if x_validPlace:
+                    for i in range(0, length):
+                        addWGT(y,x+i,PSBLPOS_WGT)
+                if y_validPlace:
+                    for i in range(0, length):
+                        addWGT(y+i,x,PSBLPOS_WGT)
+
+def latticeHeuristic(seekSize: int): # DOCU
+    """?"""
+    for y in range(0, 10):
+        for x in range(0, 10):
+            if isState(y,x,WTR) and (x+y)%seekSize==0:
+                addWGT(y,x,LATTICE_WGT)
 
 
 
 # CORE FUNCTIONS
 
 def calibrate():
-    resetValues()
-    for length in Ships:
-        for row in range(0, 10):
-            for col in range(0, 10):
-                x_validPlace = True
-                y_validPlace = True
-                for i in range(0, length):
-                    if not possibleSpot(row,col+i):
-                        x_validPlace=False
-                    if not possibleSpot(row+i,col):
-                        y_validPlace=False
-                if x_validPlace:
-                    for i in range(0, length):
-                        Board[row][col+i].value += PSBLPOS_WGT
-                if y_validPlace:
-                    for i in range(0, length):
-                        Board[row+i][col].value += PSBLPOS_WGT
-
-    # int maxShipSz = head->getShipSz();
-
-	# 	//Setting horizontal placements
-	# 	for (int y = 0; y < BoardSize; y++) {//Iterates rows
-	# 		for (int x = 0; x <= BoardSize - maxShipSz; x++) {//Iterates colums
-	# 			int xRun = 0;
-
-	# 			for (int i = x; i < x + maxShipSz; i++)
-	# 				if (!validTarget(Grid[y][i].getStatus()))
-	# 					i = BoardSize;//Breaking out
-	# 				else
-	# 					xRun++;
-
-	# 			for (ShipLNode* curShip = head; curShip != nullptr; curShip = curShip->next()) 
-	# 				if (curShip->getShipSz() <= xRun) 
-	# 					for (int i = x; i < x + curShip->getShipSz(); i++) 
-	# 						PMap[y][i]++;
-	# 		}//End of column iteration
-	# 	}//End of row iteration
+    """Resets weights and then sets weights using heuristics"""
+    resetweights()
+    hitFound = huntHeuristic()
+    if not hitFound:
+        possiblePositionsHeuristic()
+        if useLattice:
+            latticeHeuristic(Ships[0])
 
 
 
-
-    # for y, line in enumerate(Board):
-        
-    #     for x, spt in enumerate(line):
-    #         spt.value = 1 # WORKHERE
-
-    # WORKHERE
-
-
-
-def printBoard(printValues:bool):
+def printBoard(printweights:bool):
+    """Prints the board's weights if True is passed, else prints the board's states"""
     print("\n##    1   2   3   4   5   6   7   8   9   10\n")
     for y, line in enumerate(Board):
-        if y<9: # For line number
-            print(" ",end="") # For line number
-        print(y+1," [ ",sep="",end="") # For line number
+        # Line number:
+        if y<9:
+            print(" ",end="")
+        print(y+1," [ ",sep="",end="")
+        # Printing Line:
         for x, spt in enumerate(line):
-            spt.prntValue() if printValues else spt.prntState()
+            spt.prntweight() if printweights else spt.prntState()
         print("]\n") # End of line
 
 
 
 def recordShot():
-    x = int(input("\nX cord of shot: ")) - 1
-    y = int(input("Y cord of shot: ")) - 1
+    """Records and proccesses a shot and its results"""
+    x = int(input("\nX coordinate of shot: ")) - 1
+    y = int(input("Y coordinate of shot: ")) - 1
     res = input("Result (H, M, or S): ")
     if res=="M":
-        Board[y][x].state = MSS
+        set(y,x,MSS,0)
     elif res=="H":
-        Board[y][x].state = HIT
+        set(y,x,HIT,0)
     elif res=="S":
-        axis = input("X-axis or Y-axis? ")
-        coord = int(input("Cordinate: ")) - 1
-        if axis=="X" or axis=="Y":
-            axisIsX = True if axis=="X" else False
-            start = min((x if axisIsX else y), coord)
-            end = max((x if axisIsX else y), coord)
-
-            for i in range(start-1, end+2):
-                if axisIsX:
-                    Board[y][i].state = SNK
-                    Board[y][i].value = 0
-                    if inBounds(y-1,i):
-                        Board[y-1][i].state = MSS
-                        Board[y-1][i].value = 0
-                    if inBounds(y+1,i):
-                        Board[y+1][i].state = MSS
-                        Board[y+1][i].value = 0
-                    
-                else:
-                    Board[i][x].state = SNK
-                    Board[i][x].value = 0
-                    if inBounds(i,x-1):
-                        Board[i][x-1].state = MSS
-                        Board[i][x-1].value = 0
-                    if inBounds(i,x+1):
-                        Board[i][x+1].state = MSS
-                        Board[i][x+1].value = 0
-            if axisIsX:
-                if inBounds(y,start-1):
-                    Board[y][start-1].state = MSS
-                    Board[y][start-1].value = 0
-                if inBounds(y,end+1):
-                    Board[y][end+1].state = MSS
-                    Board[y][end+1].value = 0
-            else:
-                if inBounds(start-1,x):
-                    Board[start-1][x].state = MSS
-                    Board[start-1][x].value = 0
-                if inBounds(end+1,x):
-                    Board[end+1][x].state = MSS
-                    Board[end+1][x].value = 0
-
-            sunkLength = abs(start-end)
-            Ships.remove(sunkLength)
-            if len(Ships)==0:
-                GameOver==True
-        else:
-            print("ERROR: Invalid Axis!")
-            recordShot()
-    else:
-        print("ERROR! Invalid result!")
-        recordShot()
-
+        recordSink(y,x)
+        
 
 
 # MAIN
-
 printBoard(True) #DEBUG
-
 while not GameOver:
     calibrate()
     printBoard(False)
     printBoard(True)
     recordShot()
+printBoard(False)
+print("\nCongrats!")
