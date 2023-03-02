@@ -2,7 +2,7 @@ print("Hunt begins.\n")
 
 # GLOBALS
 
-useLattice=True
+useLattice = False
 Ships = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]
 
 WTR=" "
@@ -13,7 +13,8 @@ SNK="S"
 DEFAULT_WGT = 0
 PSBLPOS_WGT = 1 # Weight of a possible ship position
 LATTICE_WGT = 1 # Weight of lattice pattern
-HUNTBOX_WGT = 100 # Weight of huntbox pattern
+HUNTBOX_WGT = 90 # Weight of huntbox pattern
+BSTRWRD_WGT = 1 # Weight of best reward analysis
 
 GameOver = False
 
@@ -180,6 +181,7 @@ def huntHeuristic():
 
 def possiblePositionsHeuristic():
     """Calculates each possible position for each ship and increments the weights of the spots in that position by PSBLPOS_WGT"""
+    probSum = 0
     for length in Ships:
         for y in range(0, 10):
             for x in range(0, 10):
@@ -191,11 +193,14 @@ def possiblePositionsHeuristic():
                     if not isState(y+i,x,WTR):
                         y_validPlace=False
                 if x_validPlace:
+                    probSum += 1
                     for i in range(0, length):
                         addWGT(y,x+i,PSBLPOS_WGT)
                 if y_validPlace:
+                    probSum += 1
                     for i in range(0, length):
                         addWGT(y+i,x,PSBLPOS_WGT)
+    return probSum
 
 def latticeHeuristic(seekSize: int):
     """Caculates and weights with LATTICE_WGT the minimum set of spots that a ship of passed size must touch"""
@@ -203,6 +208,28 @@ def latticeHeuristic(seekSize: int):
         for x in range(0, 10):
             if isState(y,x,WTR) and (x+y)%seekSize==0:
                 addWGT(y,x,LATTICE_WGT)
+
+def bestRewardHeuristic():
+    resetweights()
+    best = possiblePositionsHeuristic()
+    topWgt = highestWeight()
+    bestSpots = []
+    for y, line in enumerate(Board):
+        for x, spt in enumerate(line):        
+            if spt.weight==topWgt:
+                set(y,x,MSS,0)
+                thisSum = possiblePositionsHeuristic()
+                if thisSum <= best:
+                    bestSpots.append([y,x])
+                    best = thisSum
+                set(y,x,WTR,DEFAULT_WGT)
+                resetweights()
+                possiblePositionsHeuristic()
+    printWeights() #DEBUG
+    for i in bestSpots:
+        addWGT(i[0],i[1],BSTRWRD_WGT)
+
+
 
 def highestWeight():
     """Returns the highest weight on the board"""
@@ -222,35 +249,47 @@ def calibrate():
     resetweights()
     hitFound = huntHeuristic()
     if not hitFound:
-        possiblePositionsHeuristic()
+        bestRewardHeuristic()
+        # possiblePositionsHeuristic()
         if useLattice:
             latticeHeuristic(Ships[0])
 
-def printBoard(printweights:bool):
+def printWeights():
+    """Prints the board's weights"""
     topWgt = highestWeight()
-    """Prints the board's weights if True is passed, else prints the board's states"""
-    print("\n##    1   2   3   4   5   6   7   8   9   10\n")
+    print("\nW    __1___2___3___4___5___6___7___8___9__10_\n")
     for y, line in enumerate(Board):
         # Line number:
         if y<9:
             print(" ",end="")
         print(y+1," [ ",sep="",end="")
         # Printing Line:
-        for x, spt in enumerate(line):
-            if printweights:
-                if spt.weight<=9:
-                    print(" ",int(spt.weight)," ",sep="",end="")
-                elif spt.weight<=99:
-                    print(" ",int(spt.weight),sep="",end="")
-                else:
-                    print(int(spt.weight),sep="",end="")
-                if spt.weight==topWgt:
-                    print("^",end="") 
-                else:
-                    print(" ",end="")
+        for x, spt in enumerate(line):        
+            print(" ",int(spt.weight),sep="",end="")              
+            if spt.weight==topWgt:
+                print("^",end="") 
             else:
-                print(" ",spt.state,"  ",sep="",end="")
-        print("]\n") # End of line
+                print(" ",end="")
+            if spt.weight<=9:
+                print(" ",sep="",end="")
+        print(" ]\n") # End of line
+
+def printBoard():
+    topWgt = highestWeight()
+    """Prints the board's states"""
+    print("\nB  _1_2_3_4_5_6_7_8_9_10")
+    for y, line in enumerate(Board):
+        # Line number:
+        if y<9:
+            print(" ",end="")
+        print(y+1,"[ ",sep="",end="")
+        # Printing Line:
+        for x, spt in enumerate(line):
+            if spt.weight==topWgt:
+                print("^"," ",sep="",end="")
+            else:
+                print(spt.state," ",sep="",end="")
+        print("]") # End of line
 
 def recordShot():
     """Records and proccesses a shot and its results"""
@@ -269,9 +308,9 @@ def recordShot():
 # MAIN
 while not GameOver:
     calibrate()
-    printBoard(False)
-    printBoard(True)
+    printWeights()
     print(Ships)
+    printBoard()
     recordShot()
 printBoard(False)
 print("\nCongrats!")
